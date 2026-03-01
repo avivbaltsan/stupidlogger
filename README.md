@@ -43,3 +43,12 @@ Environment parsing/validation lives in `settings.py` (powered by `pydantic-sett
 ```bash
 python3 mock_otel_generator.py
 ```
+
+## Docker
+
+```bash
+docker build -t stupidlogger .
+docker run --rm \
+  -e STUPIDLOGGER_LOG_OUTPUT=stdout \
+  stupidlogger
+```
