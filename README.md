@@ -23,6 +23,11 @@ Optional:
 - `OTEL_EXPORTER_OTLP_HEADERS` (comma-separated `k=v` list)
 - `OTEL_SERVICE_NAME` (default: `stupidlogger`)
 - `STUPIDLOGGER_INTERVAL_SECONDS` (default: `1.0`)
+- `STUPIDLOGGER_LOG_OUTPUT` (`otlp`, `stdout`, or `both`; default: `otlp`)
+- `STUPIDLOGGER_TRACE_OUTPUT` (`otlp`, `stdout`, `both`, or `none`)
+
+If `STUPIDLOGGER_LOG_OUTPUT=stdout`, logs are printed to stdout instead of being sent to the OTEL collector.
+When `STUPIDLOGGER_LOG_OUTPUT=stdout`, span creation/export is forcibly disabled (`trace_output=none`) to keep stdout log lines parse-friendly.
 
 ## Add sentence list
 
