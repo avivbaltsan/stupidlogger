@@ -4,11 +4,9 @@
 from __future__ import annotations
 
 import logging
-import os
 import random
 import signal
 import time
-from dataclasses import dataclass
 
 from opentelemetry import trace
 from opentelemetry.exporter.otlp.proto.http._log_exporter import OTLPLogExporter
@@ -23,98 +21,11 @@ from opentelemetry.sdk.trace.export import (
     SimpleSpanProcessor,
 )
 
-from sentences import SENTENCES
-
-
-SEVERITY_LEVELS = [
-    logging.DEBUG,
-    logging.INFO,
-    logging.WARNING,
-    logging.ERROR,
-    logging.CRITICAL,
-]
-
-SPAN_NAMES = [
-    "calculating-chips-density",
-    "perfecting-chips-crispiness",
-    "estimating-pita-fragility",
-    "balancing-salt-chaos",
-    "stabilizing-fry-temperature",
-    "forecasting-crunch-longevity",
-    "optimizing-dip-adhesion",
-    "simulating-snack-satisfaction",
-]
-
-LOG_OUTPUT_MODES = {"otlp", "stdout", "both"}
-TRACE_OUTPUT_MODES = {"otlp", "stdout", "both", "none"}
-
-
-def _parse_headers(raw_headers: str | None) -> dict[str, str]:
-    if not raw_headers:
-        return {}
-    parsed: dict[str, str] = {}
-    for item in raw_headers.split(","):
-        if "=" not in item:
-            continue
-        key, value = item.split("=", 1)
-        key = key.strip()
-        value = value.strip()
-        if key:
-            parsed[key] = value
-    return parsed
-
-
-def _resolve_signal_endpoint(signal_name: str) -> str:
-    specific = os.getenv(f"OTEL_EXPORTER_OTLP_{signal_name}_ENDPOINT")
-    if specific:
-        return specific
-
-    base = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
-    if base:
-        return f"{base.rstrip('/')}/v1/{signal_name.lower()}"
-
-    return f"http://localhost:4318/v1/{signal_name.lower()}"
-
-
-@dataclass
-class Settings:
-    service_name: str
-    interval_seconds: float
-    trace_endpoint: str
-    log_endpoint: str
-    headers: dict[str, str]
-    log_output: str
-    trace_output: str
-
-    @staticmethod
-    def load_from_env() -> "Settings":
-        service_name = os.getenv("OTEL_SERVICE_NAME", "stupidlogger")
-        interval_seconds = float(os.getenv("STUPIDLOGGER_INTERVAL_SECONDS", "1.0"))
-        headers = _parse_headers(os.getenv("OTEL_EXPORTER_OTLP_HEADERS"))
-        log_output = os.getenv("STUPIDLOGGER_LOG_OUTPUT", "otlp").strip().lower()
-        if log_output not in LOG_OUTPUT_MODES:
-            log_output = "otlp"
-        default_trace_output = "none" if log_output == "stdout" else "otlp"
-        trace_output = (
-            os.getenv("STUPIDLOGGER_TRACE_OUTPUT", default_trace_output).strip().lower()
-        )
-        if trace_output not in TRACE_OUTPUT_MODES:
-            trace_output = default_trace_output
-        if log_output == "stdout":
-            trace_output = "none"
-        return Settings(
-            service_name=service_name,
-            interval_seconds=max(interval_seconds, 0.1),
-            trace_endpoint=_resolve_signal_endpoint("TRACES"),
-            log_endpoint=_resolve_signal_endpoint("LOGS"),
-            headers=headers,
-            log_output=log_output,
-            trace_output=trace_output,
-        )
-
+from settings import Settings
+from sentences import LOG_SENTENCES, SPAN_SENTENCES
 
 def main() -> None:
-    settings = Settings.load_from_env()
+    settings = Settings()
 
     resource = Resource.create({"service.name": settings.service_name})
 
@@ -174,18 +85,23 @@ def main() -> None:
         print(f"logs endpoint={settings.log_endpoint}")
     print(f"log output={settings.log_output}")
     print(f"interval={settings.interval_seconds}s")
+    print(f"interval jitter ratio={settings.interval_jitter_ratio}")
     print("press Ctrl+C to stop")
 
     while running:
-        log_level = random.choice(SEVERITY_LEVELS)
-        message = (
-            random.choice(SENTENCES)
-            if SENTENCES
-            else "placeholder sentence: populate SENTENCES in sentences.py"
-        )
+        if LOG_SENTENCES:
+            sentence = random.choice(LOG_SENTENCES)
+            message = sentence.message
+            log_level = random.choice(sentence.allowed_levels)
+        else:
+            message = "placeholder sentence: populate LOG_SENTENCES in sentences.py"
+            log_level = logging.INFO
 
         if spans_enabled:
-            with tracer.start_as_current_span(random.choice(SPAN_NAMES)) as span:
+            span_name = (
+                random.choice(SPAN_SENTENCES) if SPAN_SENTENCES else "calculating-chips-density"
+            )
+            with tracer.start_as_current_span(span_name) as span:
                 span.set_attribute("stupidlogger.mock", True)
                 span.set_attribute("stupidlogger.interval_seconds", settings.interval_seconds)
                 span.set_attribute("stupidlogger.log_level", logging.getLevelName(log_level))
@@ -209,7 +125,11 @@ def main() -> None:
                 },
             )
 
-        time.sleep(settings.interval_seconds)
+        jitter = random.uniform(
+            -settings.interval_jitter_ratio, settings.interval_jitter_ratio
+        )
+        sleep_seconds = max(0.01, settings.interval_seconds * (1.0 + jitter))
+        time.sleep(sleep_seconds)
 
     if logger_provider is not None:
         logger_provider.shutdown()

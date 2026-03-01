@@ -23,6 +23,7 @@ Optional:
 - `OTEL_EXPORTER_OTLP_HEADERS` (comma-separated `k=v` list)
 - `OTEL_SERVICE_NAME` (default: `stupidlogger`)
 - `STUPIDLOGGER_INTERVAL_SECONDS` (default: `1.0`)
+- `STUPIDLOGGER_INTERVAL_JITTER_RATIO` (default: `0.2`; each sleep is randomized by +/- this ratio)
 - `STUPIDLOGGER_LOG_OUTPUT` (`otlp`, `stdout`, or `both`; default: `otlp`)
 - `STUPIDLOGGER_TRACE_OUTPUT` (`otlp`, `stdout`, `both`, or `none`)
 
@@ -31,7 +32,11 @@ When `STUPIDLOGGER_LOG_OUTPUT=stdout`, span creation/export is forcibly disabled
 
 ## Add sentence list
 
-Edit `sentences.py` and fill `SENTENCES`.
+Edit `sentences.py` and fill:
+- `LOG_SENTENCES` (message + allowed log levels)
+- `SPAN_SENTENCES` (span operation names)
+
+Environment parsing/validation lives in `settings.py` (powered by `pydantic-settings`).
 
 ## Run
 
